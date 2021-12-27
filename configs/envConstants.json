@@ -1,0 +1,7 @@
+{
+  "separator": "/",
+  "types": {
+    "f": "file",
+    "d": "directory"
+  }
+}

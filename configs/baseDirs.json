@@ -1,0 +1,22 @@
+{
+  "rootPath": "/",
+  "rootFolders": [
+    "bin",
+    "etc",
+    "lib",
+    "mnt",
+    "proc",
+    "run",
+    "srv",
+    "tmp",
+    "var",
+    "dev",
+    "home",
+    "media",
+    "opt",
+    "root",
+    "sbin",
+    "sys",
+    "usr"
+  ]
+}
