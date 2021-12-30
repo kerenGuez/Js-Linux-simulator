@@ -11,7 +11,7 @@ router.post("/:userName", authUser, (req, res) => {
   if (error) return res.status(400).send(error.details[0].message);
 
   const { user } = req.user;
-  const { filePath, completeFilePath } = extractPathParameters(req.body.path);
+  const { filePath, FilePathWithFileName } = extractPathParameters(req.body.path);
   const fileSearchResult = user.findFile(filePath).file;
 
   if (!fileSearchResult)
@@ -19,7 +19,7 @@ router.post("/:userName", authUser, (req, res) => {
       .status(400)
       .send(`touch: cannot touch '${filePath}': No such file or directory`);
 
-  newFile = new File(completeFilePath);
+  newFile = new File(FilePathWithFileName);
   fileSearchResult.content.push(newFile);
   console.log("users", JSON.stringify(users));
   res.send(newFile);

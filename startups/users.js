@@ -12,12 +12,13 @@ const users = [
   
       `
     ),
+    new File(`/root/file2.txt`, `Some Different Content`),
   ]),
   new UserSpace("yariv", []),
 ];
 
 function findUser(userName) {
-  return users.find( user => user.userName === userName );
+  return users.find((user) => user.userName === userName);
 }
 
 // console.log("users: users", JSON.stringify(users));

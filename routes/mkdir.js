@@ -12,8 +12,8 @@ router.post("/:userName", authUser, (req, res) => {
   if (error) return res.status(400).send(error.details[0].message);
 
   const { user } = req.user;
-  const { filePath, completeFilePath } = extractPathParameters(req.body.path);
-  console.log("mkdir: completeFilePath", completeFilePath);
+  const { filePath, FilePathWithFileName: FilePathWithFileName } = extractPathParameters(req.body.path);
+  console.log("mkdir: FilePathWithFileName", FilePathWithFileName);
   const fileSearchResult = user.findFile(filePath).file;
 
   if (!fileSearchResult)
@@ -21,7 +21,7 @@ router.post("/:userName", authUser, (req, res) => {
       .status(400)
       .send(`mkdir: cannot mkdir '${filePath}': No such file or directory`);
 
-  newFile = new File(completeFilePath, null, envConstants.types.d);
+  newFile = new File(FilePathWithFileName, null, envConstants.types.d);
   fileSearchResult.content.push(newFile);
   console.log("users", JSON.stringify(users));
   res.send(newFile);

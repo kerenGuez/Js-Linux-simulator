@@ -13,12 +13,12 @@ function extractPathParameters(
   filePath = filePathParts.slice(0, -1).join(separator);
   fileName = [...filePathParts].pop();
 
-  const completeFilePath = `${filePath}${separator}${fileName}`;
+  const FilePathWithFileName = `${filePath}${separator}${fileName}`;
 
   return {
-    filePath: filePath,
-    fileName: fileName,
-    completeFilePath: completeFilePath,
+    filePath,
+    fileName,
+    FilePathWithFileName,
     allPathComponents: shouldKeepEmpty
       ? filePathParts
       : filePathParts.filter((part) => !!part)

@@ -9,7 +9,7 @@ module.exports = function authTheFile(reqUser, filePath, res) {
     fileSearchResult = user.findFile(filePath);
 
 
-    if (!fileSearchResult) return res.status(400).send("Invalid filePath.");
+    if (!fileSearchResult) return res.status(404).send("Invalid filePath.");
   
     return {
       index: fileSearchResult.index,

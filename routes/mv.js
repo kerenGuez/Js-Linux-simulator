@@ -11,7 +11,7 @@ router.post("/:userName/:filePath(*)", authUser, authFile, (req, res) => {
   const { error } = validateFile(req.body);
   if (error) return res.status(400).send(error.details[0].message);
 
-  const { filePath, completeFilePath } = extractPathParameters(req.body.path);
+  const { filePath, FilePathWithFileName } = extractPathParameters(req.body.path);
   const { user } = req.user;
 
   const fileSearchResult = user.findFile(filePath).file;
@@ -22,7 +22,7 @@ router.post("/:userName/:filePath(*)", authUser, authFile, (req, res) => {
       .send(`mv: cannot mv '${filePath}': No such file or directory`);
 
   const { index, file } = req.file;
-  const copiedFile = file.clone(completeFilePath);
+  const copiedFile = file.clone(FilePathWithFileName);
 
   fileSearchResult.content.push(copiedFile);
   fileSearchResult.content.splice(index, 1);

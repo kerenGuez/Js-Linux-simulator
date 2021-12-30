@@ -26,7 +26,7 @@ class File {
   }
 
   clone(path) {
-    return new File(path, this.content, this.type, owner, this.previousDir);
+    return new File(path, this.content, this.type, this.owner, this.previousDir);
   }
 
   relativeFindFile(
