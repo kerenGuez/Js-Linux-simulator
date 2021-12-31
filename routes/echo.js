@@ -1,13 +1,12 @@
 const express = require("express");
+const authUser = require("../middleware/authUser");
 const router = express.Router();
 
-router.get("/", (req, res) => {
-  res.send(" ");
-});
-
-router.get("/:word", (req, res) => {
-  console.log("trying...");
-  res.send(req.params.word);
+router.post("/:userName", authUser, (req, res) => {
+  content = req.body.params.reduce((accumulator , currentParam) => { 
+    return accumulator + ` ${currentParam}`;
+  }, "");
+  res.send(content.slice(1));
 });
 
 module.exports = router;

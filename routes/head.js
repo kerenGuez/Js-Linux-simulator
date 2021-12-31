@@ -1,25 +1,32 @@
 const express = require("express");
 const authUser = require("../middleware/authUser");
 const authFile = require("../middleware/authFile");
+const envConstants = require("../configs/envConstants.json");
 
 const router = express.Router();
-const DEFAULT_NUM_OF_LINES = 5;
+const DEFAULT_NUM_OF_LINES = 10;
 
-router.get(
-  "/:userName/:filePath(*[^0-9])/:numLines?",
-  authUser,
-  authFile,
-  (req, res) => {
-    const { file } = req.file;
-    const number_of_wanted_lines = req.params.numLines
-      ? req.params.numLines
-      : DEFAULT_NUM_OF_LINES;
-    const first_x_lines = file.content
-      .split("\n")
-      .slice(0, number_of_wanted_lines)
-      .join("\n");
-    res.send(first_x_lines);
-  }
-);
+router.post("/:userName", authUser, authFile, (req, res) => {
+  const flags = req.body.flags || {};
+  const number_of_wanted_lines = flags.n || DEFAULT_NUM_OF_LINES;
+
+  const headResult = req.file.reduce((accumulator , currentFile) => 
+  {
+    if (req.file.length > 1 )
+      accumulator += `==> ${currentFile.path} <==\n`;
+  
+    if ( currentFile.type === envConstants.types.d ) 
+      return `head: error reading '${currentFile.path}': Is a directory`;
+  
+    return accumulator + currentFile.content
+    .split("\n")
+    .slice(0, number_of_wanted_lines)
+    .join("\n") + "\n";
+  
+  }, "");
+
+  res.send(headResult);
+
+});
 
 module.exports = router;

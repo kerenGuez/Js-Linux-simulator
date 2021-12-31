@@ -13,6 +13,7 @@ const users = [
       `
     ),
     new File(`/root/file2.txt`, `Some Different Content`),
+    new File(`/root/file3.txt`, `1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n11\n12\n13\n14\n15`)
   ]),
   new UserSpace("yariv", []),
 ];
