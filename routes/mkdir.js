@@ -1,30 +1,56 @@
 const express = require("express");
-const { File, validateFile } = require("../resources/file");
+const { File } = require("../resources/file");
 const users = require("../startups/users").users;
 const { extractPathParameters } = require("../resources/paths");
 const authUser = require("../middleware/authUser");
 const envConstants = require("../configs/envConstants.json");
+const baseDirs = require("../configs/baseDirs.json");
+
 const router = express.Router();
-let newFile;
+
+function displayErrorMessage(errorMsg, resultList) {
+  console.log(errorMsg);
+  resultList.push(errorMsg);
+}
+
+function addNewDirectory(newDirectoryPath, newDirectoryName, newDirectoriesList, parentDirectory) {
+  let newDirectory = new File(newDirectoryPath, null, envConstants.types.d, newDirectoryName);
+  newDirectoriesList.push(newDirectory.path);
+  parentDirectory.content.push(newDirectory);
+  console.log("users", JSON.stringify(users));
+}
 
 router.post("/:userName", authUser, (req, res) => {
-  const { error } = validateFile(req.body);
-  if (error) return res.status(400).send(error.details[0].message);
-
+  let containingDir, newDirectoryPath, allNewDirectories = [];
   const { user } = req.user;
-  const { filePath, FilePathWithFileName: FilePathWithFileName } = extractPathParameters(req.body.path);
-  console.log("mkdir: FilePathWithFileName", FilePathWithFileName);
-  const fileSearchResult = user.findFile(filePath).file;
+  
+  for (currentFilePath of req.body.params) {
+    const { filePath, FilePathWithFileName } = extractPathParameters(currentFilePath);
+    if (currentFilePath.startsWith(baseDirs.rootPath)) {
+      if (user.findFile(FilePathWithFileName)) {
+        displayErrorMessage(`mkdir: cannot create directory ${FilePathWithFileName}: File exists`, allNewDirectories);
+        continue;
+      }
+      
+      dirSearchResult = user.findFile(filePath);
+      if (!dirSearchResult) {
+        displayErrorMessage(`mkdir: cannot create directory '${filePath}': No such file or directory`, allNewDirectories);
+        continue;
+      }
 
-  if (!fileSearchResult)
-    return res
-      .status(400)
-      .send(`mkdir: cannot mkdir '${filePath}': No such file or directory`);
+      containingDir = dirSearchResult.file;
+      newDirectoryPath = FilePathWithFileName;
+    }
 
-  newFile = new File(FilePathWithFileName, null, envConstants.types.d);
-  fileSearchResult.content.push(newFile);
-  console.log("users", JSON.stringify(users));
-  res.send(newFile);
+    else {
+      containingDir = user.currentFile;
+      newDirectoryPath = `${containingDir.path}/${currentFilePath}`;
+    }
+  
+    addNewDirectory(newDirectoryPath, req.params["userName"], allNewDirectories, containingDir);
+  }
+
+  res.send(JSON.stringify(allNewDirectories));
 });
 
 module.exports = router;

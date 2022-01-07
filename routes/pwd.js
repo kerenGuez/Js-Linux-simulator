@@ -5,7 +5,7 @@ const environmentVariables = require("../configs/environmentVariables.json");
 
 const router = express.Router();
 
-router.get("/:userName", authUser, (_, res) => {
+router.post("/:userName", authUser, (_, res) => {
     res.send(environmentVariables.PWD);
   });
 

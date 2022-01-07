@@ -1,0 +1,14 @@
+echo
+touch
+mkdir
+cat
+rm
+rmdir
+cp
+cd
+mv
+pwd
+ls
+head
+tail
+which

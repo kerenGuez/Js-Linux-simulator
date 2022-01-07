@@ -1,3 +1,4 @@
+var fs = require("fs");
 const express = require("express");
 const app = express();
 
@@ -15,6 +16,13 @@ function getRoutes() {
     .replace(new RegExp("/i$|[^a-z]|api|v1", "gm"), "")
   }).filter(r => !!r);
 }
+
+
+const data = getRoutes().join('\n');
+
+fs.writeFile("temp.txt", data, (err) => {
+  if (err) console.log(err);
+});
 
 module.exports.server = server;
 module.exports.baseUrl = `http://localhost:${port}/api/v1`;
