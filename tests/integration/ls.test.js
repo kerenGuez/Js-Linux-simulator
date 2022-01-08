@@ -10,7 +10,7 @@ describe("/api/v1/ls/keren", () => {
     server.close();
     });
     
-      describe("POST /", () => {
+    describe("POST /", () => {
         let filePaths = ['/root']
         const filesInRoot = `name: file1.txt, type: file\nname: file2.txt, type: file\nname: file3.txt, type: file\n`;
 
@@ -19,10 +19,10 @@ describe("/api/v1/ls/keren", () => {
                 .post("/api/v1/ls/keren")
                 .send({ params: filePaths });
         }
-    
+
         it("should return all files that are in the given folder", async () => {
             const res = await exec();
-    
+
             expect(res.status).toBe(200);
             expect(res.text).toBe(filesInRoot);
         });
@@ -31,7 +31,7 @@ describe("/api/v1/ls/keren", () => {
             const filePath = '/root/file1.txt';
             filePaths = [filePath]
             const res = await exec();
-    
+
             expect(res.status).toBe(200);
             expect(res.text).toBe("\n" + filePath);
         });
@@ -40,7 +40,7 @@ describe("/api/v1/ls/keren", () => {
             filePaths = ['/root', '/bin', '/root/file1.txt'];
             const filesInRootAndBin = '/root:\n'+ filesInRoot + '/bin:\n\n\n' + '/root/file1.txt'
             const res = await exec();
-    
+
             expect(res.status).toBe(200);
             expect(res.text).toBe(filesInRootAndBin);
         });
@@ -48,7 +48,7 @@ describe("/api/v1/ls/keren", () => {
         it("should return 404 if the file doesn't exist", async () => {
             filePaths = ['noneExistingFolder'];
             const res = await exec();
-    
+
             expect(res.status).toBe(404);
         });
     }) 

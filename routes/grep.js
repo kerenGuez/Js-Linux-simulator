@@ -23,6 +23,7 @@ function getMatches(string, patternToSearch) {
 // Return a new string colored in the given position ranges.
 // "\033[0m" = regular white color
 // "\033[31m" = red color
+// Makes an error in tests using jest because strict mode doesn't recognize the color codes
 function colorMatches(stringToColor, matchPositions) {
     let start = 0;
     let newString = "";
@@ -35,7 +36,7 @@ function colorMatches(stringToColor, matchPositions) {
     }
 
     return newString + "\033[0m" + stringToColor.slice(start);
-  }
+}
 
 function basicGrep(text, wordToSearch) {
     const textLines = text.split('\n');

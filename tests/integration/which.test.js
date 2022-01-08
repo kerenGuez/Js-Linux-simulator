@@ -5,11 +5,11 @@ describe("/api/v1/which/keren", () => {
     beforeEach(() => {
         server = require("../../index").server;
     });
-      afterEach(async () => {
-        server.close();
-      });
+    afterEach(async () => {
+    server.close();
+    });
     
-      describe("POST /", () => {
+    describe("POST /", () => {
         let commandsToSearch = ['ls']
         const exec = async () => {
             return await request(server)

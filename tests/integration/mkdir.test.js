@@ -5,18 +5,18 @@ describe("/api/v1/mkdir/keren", () => {
     beforeEach(() => {
         server = require("../../index").server;
     });
-      afterEach(async () => {
-        server.close();
-      });
+    afterEach(async () => {
+    server.close();
+    });
     
-      describe("POST /", () => {
+    describe("POST /", () => {
         let filePaths = ['a']
         const exec = async () => {
             return await request(server)
                 .post("/api/v1/mkdir/keren")
                 .send({ params: filePaths });
         }
-    
+
         it("should return the file content if the file exists", async () => {
             // TODO 
         });
