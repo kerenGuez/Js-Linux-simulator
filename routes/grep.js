@@ -27,7 +27,6 @@ function getMatches(string, patternToSearch) {
 function colorMatches(stringToColor, matchPositions) {
     let start = 0;
     let newString = "";
-  
     for (positionRange of matchPositions) {
       let [matchStartIndex, matchEndIndex] = positionRange;
       newString += "\033[0m" + stringToColor.slice(start, matchStartIndex) 
@@ -38,7 +37,13 @@ function colorMatches(stringToColor, matchPositions) {
     return newString + "\033[0m" + stringToColor.slice(start);
 }
 
+function colorBackToDefault(text) {
+  return text.replace("\033[0m", "")
+  .replace("\033[31m", "");
+}
+
 function basicGrep(text, wordToSearch) {
+    text = colorBackToDefault(text);
     const textLines = text.split('\n');
     let grepResult = "";
     for (line of textLines) {

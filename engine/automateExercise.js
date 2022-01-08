@@ -70,4 +70,4 @@ async function automateCall(command) {
   console.log("result:", result);
 }
 
-automateCall("cat /root/file1.txt | grep content; cat file2.txt");
+automateCall("cat /root/file1.txt | grep content| grep File; cat file2.txt");
