@@ -15,16 +15,16 @@ function separateCommandArgs(command) {
 }
 
 async function computeCommand(command, stdin) {
+  const { route, flags, args } = separateCommandArgs(command);
   if (!apiRoutes.includes(route)) throw new Error("Command doesn't exist.");
 
-  const { route, flags, args } = separateCommandArgs(command);
   try {
     const result = await axios.post(`${baseUrl}/${route}/keren/`, {
       params: args,
       flags: flags,
       stdin: stdin,
     });
-    return result.data;
+    return await result.data;
   } catch (error) {
     console.error(error);
   }
@@ -38,17 +38,23 @@ async function pipe(pipeComponents) {
   if (componentsLength === 1)
     return await computeCommand(lastPipedCommand, false);
 
-  return await computeCommand(lastPipedCommand, pipe(pipeComponents)); // Needs to be awaited
+  return await computeCommand(lastPipedCommand, await pipe(pipeComponents)); // Needs to be awaited
+}
+
+function organizeCommand(command) {
+  return command.replace(/ +/g, " ")
+  .replace(/( +)*[|]( +)*/g, "|")
+  .replace(/( +)*[;]( +)*/g, ";");
 }
 
 async function executeCommands(commands) {
-  commands = commands.replace(/ +/g, " "); // remove redundant spaces
+  commands = organizeCommand(commands);
   commandsParts = commands.split(';');
   let result = "";
-  for (commandPart in commandsParts) {
+  for (commandPart of commandsParts) {
     let pipeParts = commandPart.split('|');
-    if (pipeParts > 1) {
-      result += pipe(pipeParts) + "\n";
+    if (pipeParts.length > 1) {
+      result += await pipe(pipeParts) + "\n";
       continue;
     }
     
@@ -60,9 +66,8 @@ async function executeCommands(commands) {
 // command is string
 async function automateCall(command) {
   if (!server.address) throw new Error("server is not running");
-
   const result = await executeCommands(command);
   console.log("result:", result);
 }
 
-automateCall("cat /root/file1.txt");
+automateCall("cat /root/file1.txt | grep content; cat file2.txt");

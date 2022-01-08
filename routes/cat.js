@@ -15,7 +15,7 @@ router.post("/:userName", authUser, authFile, (req, res) => {
     else content += theFile.content + "\n";
   }
 
-  res.send(content);
+  res.send(content.replace(/\n$/g, ''));
 });
 
 module.exports = router;
