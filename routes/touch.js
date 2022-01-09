@@ -1,28 +1,17 @@
 const express = require("express");
-const { File, validateFile } = require("../resources/file");
 const users = require("../startups/users").users;
-const { extractPathParameters } = require("../resources/paths");
 const authUser = require("../middleware/authUser");
+const envConstants = require("../configs/envConstants.json");
+const addFilesToUsers = require("../helperFunctions/addFilesToUsers");
 const router = express.Router();
-let newFile;
 
 router.post("/:userName", authUser, (req, res) => {
-  const { error } = validateFile(req.body);
-  if (error) return res.status(400).send(error.details[0].message);
-
   const { user } = req.user;
-  const { filePath, FilePathWithFileName } = extractPathParameters(req.body.path);
-  const fileSearchResult = user.findFile(filePath).file;
 
-  if (!fileSearchResult)
-    return res
-      .status(400)
-      .send(`touch: cannot touch '${filePath}': No such file or directory`);
+  let newFiles = addFilesToUsers(req.params["userName"], user, req.body.params, true, 'touch', envConstants.types.f);
 
-  newFile = new File(FilePathWithFileName);
-  fileSearchResult.content.push(newFile);
-  console.log("users", JSON.stringify(users));
-  res.send(newFile);
+  console.log("users", JSON.stringify(users[0]));
+  res.send(JSON.stringify(newFiles));
 });
 
 module.exports = router;

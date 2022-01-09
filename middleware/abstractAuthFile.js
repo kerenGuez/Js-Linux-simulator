@@ -1,6 +1,6 @@
 const { File } = require("../resources/file");
 
-module.exports = function authTheFile(reqUser, filePaths, res, stdin=null) {
+module.exports = function authTheFile(reqUser, filePaths, res, stdin=null, shouldIncludeIndex=false) {
     let files = [];  // a list of all files whose path was given.
     let fileSearchResult;
     const { user } = reqUser;
@@ -15,13 +15,20 @@ module.exports = function authTheFile(reqUser, filePaths, res, stdin=null) {
     for (filePath of filePaths){
       fileSearchResult = user.findFile(filePath);
       if (!fileSearchResult) return res.status(404).send("Invalid filePath.");
-
-      //  {
--     //    index: fileSearchResult.index,
--     //    file: fileSearchResult.file,
--     //    dir: fileSearchResult.containingDirectory
--     //  }
-      files.push(fileSearchResult.file);
+      
+      if (shouldIncludeIndex) {
+        files.push({
+          index: fileSearchResult.index,
+          file: fileSearchResult.file,
+        });
+      }
+      else files.push(fileSearchResult.file);
+      
+      //{
+      //  index: fileSearchResult.index,
+      //  file: fileSearchResult.file,
+      //  dir: fileSearchResult.containingDirectory
+      //}
     }
   
     return files;

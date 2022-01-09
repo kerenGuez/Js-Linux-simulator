@@ -1,4 +1,5 @@
 const express = require("express");
+const users = require("../startups/users").users;
 const authUser = require("../middleware/authUser");
 const envConstants = require("../configs/envConstants.json");
 
@@ -10,30 +11,33 @@ function copyFile(sourceFile, destDirectory, newCopiedFilePath) {
   return copiedFile;
 } 
 
-function validateReq(req, res) {
+function validateReq(req, res, commandName) {
   if (!req.body.params || req.body.params.length < 1)
-  return res.status(401).send("Access denied, no filePath provided.");
+    return res.status(401).send("Access denied, no filePath provided.");
 
   if (req.body.params === 1)
-    return res.status(400).send(`cp: missing destination file operand after ${req.body.params[0]}`);
+    return res.status(400).send(`${commandName}: missing destination file operand after ${req.body.params[0]}`);
 }
 
-function findFile(user, filePath, res, throwError=true) {
+function findFile(user, filePath, res, commandName, throwError=true) {
   const foundFile = user.findFile(filePath).file;
   if (!foundFile && throwError)
     return res
       .status(400)
-      .send(`cp: cannot create regular file '${filePath}': No such file or directory`);
+      .send(`${commandName}: cannot create regular file '${filePath}': No such file or directory`);
 
   return foundFile;
 }
 
-function CopySrcFileToDest(user, sourceFile, destFilePath, fileNamePattern, res) {
+function CopySrcFileToDest(user, sourceFile, destFilePath, res, commandName) {
   let destinationDirectory;
+  const fileNamePattern = "\\w+(?:\\.\\w+)*?$";
+
   const fileNamePart = destFilePath.match(new RegExp(`^${fileNamePattern}`))
   if (!fileNamePart) {
-    const destDirPath = destFilePath.replace(new RegExp(fileNamePattern), "");
-    destinationDirectory = findFile(user, destDirPath, res);
+    // const destDirPath = destFilePath.replace(new RegExp(fileNamePattern), "");
+    const destDirPath = destFilePath;
+    destinationDirectory = findFile(user, destDirPath, res, commandName);
     
     fileName = sourceFile.name;
   }
@@ -43,22 +47,21 @@ function CopySrcFileToDest(user, sourceFile, destFilePath, fileNamePattern, res)
   }
   
   const copiedFile = copyFile(sourceFile, destinationDirectory, `${destinationDirectory.path}/${fileName}`);
-  res.send(copiedFile);
+  return copiedFile;
 }
 
-function copyMultipleSourcesToDest(user, res, destDirectoryPath, sourcesPaths) {
-  console.log("sourcesPaths = ", sourcesPaths)
-  const destDirectory = findFile(user, destDirectoryPath, res);
+function copyMultipleSourcesToDest(user, res, destDirectoryPath, sourcesPaths, commandName) {
+  const destDirectory = findFile(user, destDirectoryPath, res, commandName);
   const allCopiedFiles = [];
   if (destDirectory.type !== envConstants.types.d)
     return res
     .status(404)
-    .send(`cp: target '${destDirectoryPath}' is not a directory`);
+    .send(`${commandName}: target '${destDirectoryPath}' is not a directory`);
   
   for (sourcePath of sourcesPaths) {
-    let foundFile = findFile(user, sourcePath, res, false);
+    let foundFile = findFile(user, sourcePath, res, commandName, false);
     if (!foundFile) {
-      console.log(`cp: cannot stat ${sourcePath}: No such file or directory`);
+      console.log(`${commandName}: cannot stat ${sourcePath}: No such file or directory`);
       continue;
     }
 
@@ -66,29 +69,39 @@ function copyMultipleSourcesToDest(user, res, destDirectoryPath, sourcesPaths) {
     allCopiedFiles.push(copiedFile);
   }
 
-  res.send(allCopiedFiles);
+  return allCopiedFiles;
 }
 
-router.post("/:userName", authUser, (req, res) => {
-  const { user } = req.user;
-  const lastItemIndex = req.body.params.length - 1;
-  const fileNamePattern = "\\w+(?:\\.\\w+)*?$";
+function copyAndOrRemove(user, filePaths, res, commandName) {
+  let allCopiedFiles;
+  const lastFileIndex = filePaths.length - 1;
 
-  validateReq(req, res);
-
-  const sourceFile = req.body.params[0];
-  const destFilePath  = req.body.params[lastItemIndex];
+  const sourceFile = filePaths[0];
+  const destFilePath  = filePaths[lastFileIndex];
   const sourceFileSearchResult = user.findFile(sourceFile).file;
 
   if (!sourceFileSearchResult)
-    console.log(`cp: cannot stat ${sourceFile}: No such file or directory`)
+    console.log(`${commandName}: cannot stat ${sourceFile}: No such file or directory`)
 
-  if (req.body.params.length === 2) {
-    CopySrcFileToDest(user, sourceFileSearchResult, destFilePath, fileNamePattern, res)
+  if (filePaths.length === 2) {
+    allCopiedFiles = CopySrcFileToDest(user, sourceFileSearchResult, destFilePath, res)
   }
+  else {
+    allCopiedFiles = copyMultipleSourcesToDest(user, res, destFilePath, filePaths.slice(0, lastFileIndex), commandName);
+  }
+  return allCopiedFiles;
 
-  copyMultipleSourcesToDest(user, res, destFilePath, req.body.params.slice(0, lastItemIndex));
+}
 
+router.post("/:userName", authUser, (req, res) => {
+  const commandName = 'cp';
+  validateReq(req, res, commandName);
+  const { user } = req.user;
+  let allCopiedFiles = copyAndOrRemove(user, req.body.params, res, commandName);
+
+  console.log("users", JSON.stringify(users[0]));
+  console.log(allCopiedFiles);
+  res.send(allCopiedFiles);
 });
 
 module.exports = router;
