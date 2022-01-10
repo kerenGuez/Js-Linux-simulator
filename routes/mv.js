@@ -5,7 +5,6 @@ const copyOrMoveFiles = require("../helperFunctions/copyOrMoveFiles");
 
 const router = express.Router();
 
-// TODO generic function for mv and cp
 router.post("/:userName", authUser, (req, res) => {
   const commandName = 'mv';
   const { user } = req.user;
