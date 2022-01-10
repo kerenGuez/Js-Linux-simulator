@@ -1,17 +1,17 @@
 const express = require("express");
 const authUser = require("../middleware/authUser");
-const authFile = require("../middleware/authFile");
 const users = require("../startups/users").users;
-const envConstants = require("../configs/envConstants.json");
+const rmFileOrDir = require("../helperFunctions/rmFileOrDir");
+
 const router = express.Router();
 
-router.delete("/:userName/:filePath(*)", authUser, authFile, (req, res) => {
-  const { file } = req.file;
+router.post("/:userName", authUser, (req, res) => {
   const { user } = req.user;
-  const deletedFile = user.removeFile(file, envConstants.types.d);
 
-  console.log("users after delete", JSON.stringify(users));
-  res.send(deletedFile);
+  let removedFiles = rmFileOrDir(user, req.body.params, 'rmdir');
+
+  console.log("users", JSON.stringify(users[0]));
+  res.send(JSON.stringify(removedFiles));
 });
 
 module.exports = router;
