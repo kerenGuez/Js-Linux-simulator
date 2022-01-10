@@ -93,11 +93,15 @@ class File {
     const foundFileIndex = file.content.findIndex(
       (currFile) => currFile.name === fileToRemove.name
     );
+
+    // to handle the case you have a directory and file with the same name on the same folder
     if (file.content[foundFileIndex].type === type) {
       if (foundFileIndex !== -1) return file.content.splice(foundFileIndex, 1);
+
       console.warn("File not found!");
       return;
     }
+  
     console.warn(
       `cannot remove '${file.content[foundFileIndex].name}': Not a ${type}`
     );
