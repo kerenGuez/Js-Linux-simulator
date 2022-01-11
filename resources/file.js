@@ -29,23 +29,10 @@ class File {
     return new File(path, this.content, this.type, this.owner, this.previousDir);
   }
 
-  relativeFindFile(
-    filePath,
-    currentFile = null,
-    currentFileIndex = null,
-    currentDir = "/"
-  ) {
+  relativeFindFile(filePath, type = null, currentFile = null, currentFileIndex = null, currentDir = "/") {
     currentFile = currentFile ? currentFile : this;
-    // console.log("file: filePath:", filePath);
-    // console.log("file: currentFile:", currentFile);
 
-    let { allPathComponents } = extractPathParameters(
-      filePath,
-      envConstants.separator,
-      false
-    );
-    // console.log("file: allPathComponents:", allPathComponents);
-
+    let { allPathComponents } = extractPathParameters(filePath, envConstants.separator, false);
     if (allPathComponents.length < 1)
       return {
         index: currentFileIndex,
@@ -54,19 +41,27 @@ class File {
       };
 
     const pathPartToSearch = allPathComponents.shift();
-    // console.log("file: pathPartToSearch:", pathPartToSearch);
 
     const foundFileIndex = currentFile.content.findIndex(
-      (file) => file.name === pathPartToSearch
+      (file) => {
+        if (allPathComponents.length) {
+          if (file.type !== envConstants.types.d) return false;
+        }
+
+        else {
+          if (type && file.type !== type) return false;
+        }
+        return file.name === pathPartToSearch
+      }
     );
-    // console.log("file: foundFileIndex:", foundFileIndex);
 
     return foundFileIndex !== -1
       ? this.relativeFindFile(
           allPathComponents.join(envConstants.separator),
+          type,
           currentFile.content[foundFileIndex],
           foundFileIndex,
-          currentFile
+          currentFile,
         )
       : false;
   }

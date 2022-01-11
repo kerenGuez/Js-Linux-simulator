@@ -35,14 +35,14 @@ class UserSpace {
     ).file;
   }
 
-  findFile(filePath) {
+  findFile(filePath, type=null) {
     // Absolute path search  
     if (filePath.startsWith(baseDirs.rootPath)) {
-      return this.files.relativeFindFile(filePath);
+      return this.files.relativeFindFile(filePath, type);
     }
 
     // Relative path search
-    return this.currentFile.relativeFindFile(filePath);
+    return this.currentFile.relativeFindFile(filePath, type);
   }
 }
 

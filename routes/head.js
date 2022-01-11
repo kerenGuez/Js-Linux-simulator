@@ -13,7 +13,6 @@ router.post("/:userName", authUser, authFile, (req, res) => {
   const headResult = getLinesFromArray(req.file, number_of_wanted_lines);
 
   res.send(headResult);
-
 });
 
 module.exports = router;

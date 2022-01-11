@@ -14,33 +14,44 @@ function addNewFile(newPath, fileOwner, addedFilesAndDirsList, parentDirectory, 
     parentDirectory.content.push(newDirectory);
 }
 
+function getContainingDirAndNewPath(user, currentFilePath, shouldAcceptExistingFile, commandName, allNewFiles, fileType) {
+  const { filePath, FilePathWithFileName } = extractPathParameters(currentFilePath);
+
+  if (currentFilePath.startsWith(baseDirs.rootPath)) {
+    const fullPathSearchResult = user.findFile(FilePathWithFileName, fileType);
+    if (fullPathSearchResult) {
+      if (!shouldAcceptExistingFile) 
+        displayErrorMessage(`${commandName}: cannot create directory ${FilePathWithFileName}: File exists`, allNewFiles);
+      return;  
+    }
+    
+    let containingDirSearchResult = user.findFile(filePath);
+    if (!containingDirSearchResult) {
+      displayErrorMessage(`${commandName}: cannot create directory '${filePath}': No such file or directory`, allNewFiles);
+      return;
+    }
+
+    return {
+      containingDir: containingDirSearchResult.file,
+      newPath: FilePathWithFileName,
+    }
+  }
+
+  return {
+    containingDir: user.currentFile,
+    newPath: `${containingDir.path}/${currentFilePath}`
+  }
+}
+
 function addNewFilesOrDirs(owner, user, pathsToNewFiles, shouldAcceptExistingFile, commandName, type) {
-    let containingDir, newPath, allNewFiles = [];
+    let allNewFiles = [];
     
     for (currentFilePath of pathsToNewFiles) {
-      const { filePath, FilePathWithFileName } = extractPathParameters(currentFilePath);
-      if (currentFilePath.startsWith(baseDirs.rootPath)) {
-        if (user.findFile(FilePathWithFileName)) {
-          if (!shouldAcceptExistingFile) 
-            displayErrorMessage(`${commandName}: cannot create directory ${FilePathWithFileName}: File exists`, allNewFiles);
-  
-          continue;  
-        }
-        
-        let searchResult = user.findFile(filePath);
-        if (!searchResult) {
-          displayErrorMessage(`${commandName}: cannot create directory '${filePath}': No such file or directory`, allNewFiles);
-          continue;
-        }
-  
-        containingDir = searchResult.file;
-        newPath = FilePathWithFileName;
-      }
-      else {
-        containingDir = user.currentFile;
-        newPath = `${containingDir.path}/${currentFilePath}`;
-      }
-      addNewFile(newPath, owner, allNewFiles, containingDir, type);
+      const result = getContainingDirAndNewPath(user, currentFilePath,
+         shouldAcceptExistingFile, commandName, allNewFiles, type);
+      
+      if (result)
+        addNewFile(result.newPath, owner, allNewFiles, result.containingDir, type);
     }
     return allNewFiles;
 }

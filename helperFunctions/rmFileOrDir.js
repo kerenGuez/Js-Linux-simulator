@@ -5,11 +5,11 @@ function displayErrorMessage(errorMsg, resultList) {
     resultList.push(errorMsg);
 }
 
-function RemoveFilesOrDirs(user, pathsToFilesToRemove, commandName) {
+function RemoveFilesOrDirs(user, pathsToFilesToRemove, commandName, fileType) {
     let allRemovedFiles = [];
     
     for (currentFilePath of pathsToFilesToRemove) {                
-        let foundFileToRemove = user.findFile(currentFilePath);
+        let foundFileToRemove = user.findFile(currentFilePath, fileType);
 
         if (!foundFileToRemove) {
             displayErrorMessage(`${commandName}: cannot remove '${currentFilePath}': No such file or directory`, allRemovedFiles);

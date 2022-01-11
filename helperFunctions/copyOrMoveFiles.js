@@ -1,4 +1,6 @@
 const envConstants = require("../configs/envConstants.json");
+const baseDirs = require("../configs/baseDirs.json");
+const { extractPathParameters } = require("../resources/paths");
 
 function copyFile(sourceFile, destDirectory, newCopiedFilePath, shouldRemoveSrcFile=false) {
     const copiedFile = sourceFile.file.clone(newCopiedFilePath);
@@ -19,8 +21,8 @@ function validateReq(req, res, commandName) {
       return res.status(400).send(`${commandName}: missing destination file operand after ${req.body.params[0]}`);
 }
 
-function findFile(user, filePath, res, commandName, throwError=true) {
-    const foundFile = user.findFile(filePath);
+function findFile(user, filePath, res, commandName, fileType, throwError=true) {
+    const foundFile = user.findFile(filePath, fileType);
     if (!foundFile && throwError)
       return res
         .status(400)
@@ -29,42 +31,66 @@ function findFile(user, filePath, res, commandName, throwError=true) {
     return foundFile;
 }
 
+// If a file with the same name already exists in the directory, remove it.
+function removeExisting(user, pathToSearch, fileType) {
+  const searchResult = user.findFile(pathToSearch, fileType);
+  if (searchResult) {
+    const containingDir = searchResult.containingDirectory.content;
+    containingDir.splice(searchResult.index, 1);
+  }
+}
+
 function CopySrcFileToDest(user, sourceFile, destFilePath, res, commandName, shouldRemoveSrcFile=false) {
-    let destinationDirectory;
-    const fileNamePattern = "\\w+(?:\\.\\w+)*?$";
-  
-    const fileNamePart = destFilePath.match(new RegExp(`^${fileNamePattern}`))
-    if (!fileNamePart) {
-      const destDirPath = destFilePath;
-      destinationDirectory = findFile(user, destDirPath, res, commandName).file;
-      
-      fileName = sourceFile.file.name;
+    let destinationDirectory, nameOfCopiedFile;
+    // file name pattern e.g: 'file.txt' (accepts words possibly followed by suffix)
+    const { filePath, allPathComponents, fileName } = extractPathParameters(destFilePath);
+    const destFileSearchResult = user.findFile(destFilePath, envConstants.types.d).file;
+
+    if (destFileSearchResult) {
+      destinationDirectory = destFileSearchResult;
+      nameOfCopiedFile = sourceFile.file.name;
     }
+
     else {
-      fileName = fileNamePart[0];
-      destinationDirectory = user.currentFile;
+      if (allPathComponents.length === 1)
+        destinationDirectory = user.currentFile;
+      
+      else 
+         destinationDirectory = findFile(user, filePath, res, commandName, envConstants.types.d).file;
+      
+      nameOfCopiedFile = fileName;
     }
     
-    const copiedFile = copyFile(sourceFile, destinationDirectory, `${destinationDirectory.path}/${fileName}`, shouldRemoveSrcFile);
+    const newPath = `${destinationDirectory.path}/${nameOfCopiedFile}`;
+    removeExisting(user, newPath, envConstants.types.f);
+    const copiedFile = copyFile(sourceFile, destinationDirectory, newPath, shouldRemoveSrcFile);
     return copiedFile;
 }
 
 function copyMultipleSourcesToDest(user, res, destDirectoryPath, sourcesPaths, commandName, shouldRemoveSrcFile=false) {
-    const destDirectory = findFile(user, destDirectoryPath, res, commandName).file;
-    const allCopiedFiles = [];
-    if (destDirectory.type !== envConstants.types.d)
-      return res
-      .status(404)
-      .send(`${commandName}: target '${destDirectoryPath}' is not a directory`);
+    const destDirectory = findFile(user, destDirectoryPath, res, commandName, envConstants.types.d).file;
+    const allCopiedFiles = [], copiedFilesNames = [];
     
     for (sourcePath of sourcesPaths) {
-      let foundFile = findFile(user, sourcePath, res, commandName, false);
+      let foundFile = findFile(user, sourcePath, res, commandName, envConstants.types.f, false);
       if (!foundFile) {
         console.log(`${commandName}: cannot stat ${sourcePath}: No such file or directory`);
         continue;
       }
   
-      const copiedFile = copyFile(foundFile, destDirectory, `${destDirectory.path}/${foundFile.file.name}`, shouldRemoveSrcFile);
+      const newCopiedFileName = foundFile.file.name;
+      const newPath = `${destDirectory.path}/${newCopiedFileName}`;
+      // You cannot copy 2 files with the same name at once.
+      if (copiedFilesNames.includes(newCopiedFileName)) {
+        const errorMsg = `${commandName}: will not overwrite just-created '${newPath}' with '${sourcePath}'`;
+        console.log(errorMsg);
+        allCopiedFiles.push(errorMsg);
+        continue;
+      }
+
+      removeExisting(user, newPath, envConstants.types.f);
+      const copiedFile = copyFile(foundFile, destDirectory, newPath, shouldRemoveSrcFile);
+      copiedFilesNames.push(newCopiedFileName);
       allCopiedFiles.push(copiedFile);
     }
   
@@ -78,7 +104,7 @@ function copyAndOrRemove(user, filePaths, req, res, commandName, shouldRemoveSrc
   
     const sourceFile = filePaths[0];
     const destFilePath  = filePaths[lastFileIndex];
-    const sourceFileSearchResult = user.findFile(sourceFile);
+    const sourceFileSearchResult = user.findFile(sourceFile, envConstants.types.f);
   
     if (!sourceFileSearchResult.file)
       console.log(`${commandName}: cannot stat ${sourceFileSearchResult.file}: No such file or directory`)
