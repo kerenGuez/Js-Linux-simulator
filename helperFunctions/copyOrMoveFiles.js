@@ -74,7 +74,8 @@ function copyMultipleSourcesToDest(user, res, destDirectoryPath, sourcesPaths, c
     for (sourcePath of sourcesPaths) {
       let foundFile = findFile(user, sourcePath, res, commandName, envConstants.types.f, false);
       if (!foundFile) {
-        console.log(`${commandName}: cannot stat ${sourcePath}: No such file or directory`);
+        const errorMsg = `${commandName}: cannot stat ${sourcePath}: No such file or directory`;
+        allCopiedFiles.push(errorMsg);
         continue;
       }
   

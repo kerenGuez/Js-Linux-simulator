@@ -13,3 +13,5 @@ head
 tail
 which
 grep
+redirect
+append

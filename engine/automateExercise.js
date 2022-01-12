@@ -14,7 +14,7 @@ function separateCommandArgs(command) {
   };
 }
 
-async function computeCommand(command, stdin) {
+async function computeCommand(command, stdin=false) {
   const { route, flags, args } = separateCommandArgs(command);
   if (!apiRoutes.includes(route)) throw new Error("Command doesn't exist.");
 
@@ -46,6 +46,31 @@ function organizeCommand(command) {
   .replace(/( +)*[|]( +)*/g, "|")
   .replace(/( +)*[;]( +)*/g, ";");
 }
+
+async function redirectOrAppend(command, actionName) {
+  const sign = (actionName === 'redirect') ? '>' : '>>';
+  const parts = command.trim().split(sign);
+  const [ commandForContent, filePathToCopyTo ] = parts;
+  const contentForFile = await computeCommand(commandForContent);
+  const newActionCommand = `${actionName} ${contentForFile} ${filePathToCopyTo}`;
+  return await computeCommand(newActionCommand);
+}
+
+async function redirect(command) {
+  return await redirectOrAppend(command, 'redirect');
+}
+
+async function append(command) {
+  return await redirectOrAppend(command, 'append');
+}
+
+const actions = "><|&"
+const getActionPattern = action => `[^${actions}]+[${action}][^${actions}]+`;
+const methodsToActions = [
+  {action: "|", method: pipe}, 
+  {action: ">", method: redirect},
+  {action: ">>", method: append},
+]
 
 async function executeCommands(commands) {
   commands = organizeCommand(commands);

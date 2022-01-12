@@ -15,6 +15,8 @@ const head = require("../routes/head");
 const tail = require("../routes/tail");
 const which = require("../routes/which");
 const grep = require("../routes/grep");
+const redirect = require("../routes/redirect");
+const append = require("../routes/append");
 
 module.exports = function (app) {
   app.use(express.json());
@@ -33,4 +35,6 @@ module.exports = function (app) {
   app.use("/api/v1/tail", tail);
   app.use("/api/v1/which", which);
   app.use("/api/v1/grep", grep);
+  app.use("/api/v1/redirect", redirect);
+  app.use("/api/v1/append", append);
 };

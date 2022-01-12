@@ -1,5 +1,6 @@
 const { File } = require("../resources/file");
 const baseDirs = require("../configs/baseDirs.json");
+const envConstants = require("../configs/envConstants.json");
 const { extractPathParameters } = require("../resources/paths");
 
 
@@ -8,24 +9,43 @@ function displayErrorMessage(errorMsg, resultList) {
     resultList.push(errorMsg);
 }
 
-function addNewFile(newPath, fileOwner, addedFilesAndDirsList, parentDirectory, type) {
-    let newDirectory = new File(newPath, null, type, fileOwner);
+function removeExisting(existingFile) {
+  const containingDir = existingFile.containingDirectory.content;
+  containingDir.splice(existingFile.index, 1); 
+}
+
+function addNewFile(newPath, fileOwner, addedFilesAndDirsList, parentDirectory, type, content=null) {
+    let newDirectory = new File(newPath, content, type, fileOwner);
     addedFilesAndDirsList.push(newDirectory.path);
     parentDirectory.content.push(newDirectory);
 }
 
-function getContainingDirAndNewPath(user, currentFilePath, shouldAcceptExistingFile, commandName, allNewFiles, fileType) {
+function handleFileAlreadyExists(user, filePath, shouldAcceptExistingFile, commandName, allNewFiles, fileType, content, shouldOverride, shouldAppend) {
+  const fullPathSearchResult = user.findFile(filePath, fileType);
+  if (fullPathSearchResult) {
+    if (shouldAppend) {
+      fullPathSearchResult.file.content += '\n' + content;
+      allNewFiles.push(filePath);
+      return false;
+    }
+
+    if (shouldOverride) {
+      removeExisting(fullPathSearchResult);
+      return true;
+    }
+
+    if (!shouldAcceptExistingFile) 
+        displayErrorMessage(`${commandName}: cannot create directory ${filePath}: File exists`, allNewFiles);
+      return false; 
+  }
+  return true;  
+}
+
+function getContainingDirAndNewPath(user, currentFilePath, commandName, allNewFiles) {
   const { filePath, FilePathWithFileName } = extractPathParameters(currentFilePath);
 
-  if (currentFilePath.startsWith(baseDirs.rootPath)) {
-    const fullPathSearchResult = user.findFile(FilePathWithFileName, fileType);
-    if (fullPathSearchResult) {
-      if (!shouldAcceptExistingFile) 
-        displayErrorMessage(`${commandName}: cannot create directory ${FilePathWithFileName}: File exists`, allNewFiles);
-      return;  
-    }
-    
-    let containingDirSearchResult = user.findFile(filePath);
+  if (currentFilePath.startsWith(baseDirs.rootPath)) {   
+    let containingDirSearchResult = user.findFile(filePath, envConstants.types.d);
     if (!containingDirSearchResult) {
       displayErrorMessage(`${commandName}: cannot create directory '${filePath}': No such file or directory`, allNewFiles);
       return;
@@ -43,15 +63,20 @@ function getContainingDirAndNewPath(user, currentFilePath, shouldAcceptExistingF
   }
 }
 
-function addNewFilesOrDirs(owner, user, pathsToNewFiles, shouldAcceptExistingFile, commandName, type) {
+function addNewFilesOrDirs(owner, user, pathsToNewFiles, shouldAcceptExistingFile, commandName, type, content=null, shouldOverride=false, shouldAppend=false) {
     let allNewFiles = [];
     
     for (currentFilePath of pathsToNewFiles) {
+      const shouldContinue = handleFileAlreadyExists(user, currentFilePath, shouldAcceptExistingFile,
+         commandName, allNewFiles, type, content, shouldOverride, shouldAppend);
+      if (!shouldContinue)
+        continue;
+    
       const result = getContainingDirAndNewPath(user, currentFilePath,
-         shouldAcceptExistingFile, commandName, allNewFiles, type);
+         shouldAcceptExistingFile, commandName, allNewFiles, type, shouldOverride);
       
       if (result)
-        addNewFile(result.newPath, owner, allNewFiles, result.containingDir, type);
+        addNewFile(result.newPath, owner, allNewFiles, result.containingDir, type, content);
     }
     return allNewFiles;
 }
