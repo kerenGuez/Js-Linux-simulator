@@ -24,17 +24,27 @@ function getMatches(string, patternToSearch) {
 // "\033[0m" = regular white color
 // "\033[31m" = red color
 // Makes an error in tests using jest because strict mode doesn't recognize the color codes
-function colorMatches(stringToColor, matchPositions) {
+function colorMatches(stringToColor, matchPositions, flags=null) {
     let start = 0;
     let newString = "";
+    flags = flags || {};
     for (positionRange of matchPositions) {
       let [matchStartIndex, matchEndIndex] = positionRange;
-      newString += "\033[0m" + stringToColor.slice(start, matchStartIndex) 
-      + "\033[31m" + stringToColor.slice(matchStartIndex, matchEndIndex);
+      const coloredMatchedPart = "\033[31m" + stringToColor.slice(matchStartIndex, matchEndIndex);
+      if (flags.o) {
+        newString += coloredMatchedPart + '\n';
+      }
+
+      else
+        newString += "\033[0m" + stringToColor.slice(start, matchStartIndex) + coloredMatchedPart;
       start = matchEndIndex;
     }
 
-    return newString + "\033[0m" + stringToColor.slice(start);
+    if (flags.o) {
+      return newString + "\033[0m";
+    }
+
+    return newString + "\033[0m" + stringToColor.slice(start) + '\n';
 }
 
 function colorBackToDefault(text) {
@@ -42,39 +52,42 @@ function colorBackToDefault(text) {
   .replace("\033[31m", "");
 }
 
-function basicGrep(text, wordToSearch) {
+function basicGrep(text, wordToSearch, flags) {
     text = colorBackToDefault(text);
     const textLines = text.split('\n');
     let grepResult = "";
     for (line of textLines) {
         let escapedPattern = escapeRegex(wordToSearch);
         let matchesPositions = getMatches(line, escapedPattern);
-        if (matchesPositions.length)
-            grepResult += colorMatches(line, matchesPositions) + "\n";
+        if (matchesPositions.length) 
+            grepResult += colorMatches(line, matchesPositions, flags);   
     }
-    return grepResult.replace(/\n$/g, "");
+    return grepResult.replace(/(\n)+$/g, "");
 }
 
 // const string = `hello
-// hello mate
+// hello mate hello!
 // did you here it?
-// hear my hello?`
-// console.log(basicGrep(string, "hello"));
+// hear my hello?
+// hello
+// `
+// console.log(basicGrep(string, "hello", {'o': true}));
 
 router.post("/:userName", authUser, (req, res) => {
   let content = "";
   let stdin = req.body.stdin;
   let [pattern, ...files] = req.body.params;
+  let flags = req.body.flags || {};
   const allFiles = authTheFile(req.user, files, res, stdin);
   for (let i = 0; i < allFiles.length; i++) {
     if (allFiles[i].type == envConstants.types.d)
       content += `grep: ${allFiles[i].path}: Is a directory\n`;
     
     else if (allFiles.length === 1)
-        content += basicGrep(allFiles[i].content, pattern) + '\n';
+        content += basicGrep(allFiles[i].content, pattern, flags) + '\n';
     
     else {
-        content += `${req.body.params[i + 1]}:` + basicGrep(allFiles[i].content, pattern) + '\n';
+        content += `${req.body.params[i + 1]}:` + basicGrep(allFiles[i].content, pattern, flags) + '\n';
     }
   }
 

@@ -8,7 +8,7 @@ const DEFAULT_NUM_OF_LINES = 10;
 
 router.post("/:userName", authUser, authFile, (req, res) => {
   const flags = req.body.flags || {};
-  const number_of_wanted_lines = flags.n || DEFAULT_NUM_OF_LINES;
+  const number_of_wanted_lines = Number(flags.n) || DEFAULT_NUM_OF_LINES;
 
   const headResult = getLinesFromArray(req.file, number_of_wanted_lines);
 
