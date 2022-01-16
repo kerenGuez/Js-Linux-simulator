@@ -3,7 +3,8 @@ const axios = require("axios");
 
 // Receive a single command and separate the it to the route, flags and given arguments
 function separateCommandArgs(command) {
-  let [route, ...args] = command.split(" ");
+  const separatedCommand = command.match(/('.*'|".*"|\S+)/g); // matches non spaces and things in parentheses only.
+  let [route, ...args] = separatedCommand.map(arg => arg.replace(/^(\"|\')|(\"|\')$/g, "")); // remove surrounding quotes.
   const allFlags = {};
   const flags = args.filter((v) => v.match(/^\-\w+$/));
   for (let flag of flags) {
@@ -20,12 +21,12 @@ function separateCommandArgs(command) {
       allFlags[flag[flag.length -1]] = true;
     }
   }
-  const argsList = args.filter((v) => !v.match(/^\-\w+$/));  
+  const argsList = args.filter((v) => !v.match(/^\-\w+$/)); // filter the flags out of the args list 
 
   return {
     route,
     flags: allFlags,
-    args: argsList,
+    args: argsList.length > 0 ? argsList : [""]
   };
 }
 
@@ -46,7 +47,6 @@ async function computeCommand(command, stdin=false) {
 }
 
 async function pipe(pipeCommand) {
-  console.log("pipe command: ", pipeCommand);
   const pipeComponents = pipeCommand.split('|');
   const componentsLength = pipeComponents.length;
   if (componentsLength < 1) return "error";
@@ -58,12 +58,6 @@ async function pipe(pipeCommand) {
   return await computeCommand(lastPipedCommand, await pipe(pipeComponents.join('|'))); // Needs to be awaited
 }
 
-function organizeCommand(command) {
-  return command.replace(/ +/g, " ")
-  .replace(/( +)*[|]( +)*/g, "|")
-  .replace(/( +)*[;]( +)*/g, ";");
-}
-
 async function redirectOrAppend(command, actionName, stdin=false) {
   const sign = (actionName === 'redirect') ? '>' : '>>';
   const parts = command.trim().split(sign);
@@ -71,7 +65,7 @@ async function redirectOrAppend(command, actionName, stdin=false) {
   // If it was piped into redirect, allow pure content to be passed through
   // Otherwise, assume you were given a command to evaluate.
   let contentForFile = stdin ? commandForContent : await computeCommand(commandForContent);
-  const newActionCommand = `${actionName} ${contentForFile} ${filePathToCopyTo}`;
+  const newActionCommand = `${actionName} "${contentForFile}" ${filePathToCopyTo}`;
   return await computeCommand(newActionCommand);
 }
 
@@ -83,12 +77,24 @@ async function append(command, stdin=false) {
   return await redirectOrAppend(command, 'append', stdin);
 }
 
+async function AndOrOperators(command, sign, stdin=false) {
+  const [beforeSign, afterSign] = command.split(sign);
+  const result = stdin ? beforeSign : await computeCommand(beforeSign);
+  // if ($? === 0)
+  switch(sign) {
+    case '&&': if (result) return await computeCommand(afterSign);
+    case '||': if (!result) return await computeCommand(afterSign);
+  }
+}
+
 const actions = "><|&"
 
 // Gets the first expression found, and it's action is save in the group named 'sign'
-const actionPattern = `[^${actions}]+(?<sign>[${actions}]{1,2})[^${actions}]+`;
-const pipePattern = `[^${actions}]+(?<sign>[|])[^${actions}]+([|][^${actions}]+)*`
+const actionPattern = `(?<expression>[^${actions}]+(?<sign>[${actions}]{1,2})[^${actions}]+)`;
+const pipePattern = `(?<expression>[^${actions}]+(?<sign>[|])[^${actions}]+([|][^${actions}]+)*)`
+// const ifOperatorPattern = `/(?<expression>(?<beforeSign>[^${actions}]+?)(?<sign>&&)(?<rest>.+))/`
 
+// returns the first appearing match in the text - whether it's pipe or general command
 function getMatch(command) {
   const generalActionMatch = command.match(new RegExp(actionPattern));
   const pipeMatch = command.match(new RegExp(pipePattern));
@@ -96,12 +102,7 @@ function getMatch(command) {
     return generalActionMatch;
   
   return pipeMatch;
-
 }
-
-// async function solveAction() {
-
-// }
 
 const methodsToActions = [
   {action: "|", method: pipe}, 
@@ -109,25 +110,28 @@ const methodsToActions = [
   {action: ">>", method: append},
 ]
 
-async function executeCommands(commands) {
-  commands = organizeCommand(commands);
+async function executeCommands(commands, lastCommandExecuted) {
+  lastCommandExecuted = lastCommandExecuted || [];
   commandsParts = commands.split(';');
   let result = "";
+  let stdin = false;
   for (let commandPart of commandsParts) {
     const currentCommandMatch = getMatch(commandPart);
     if (currentCommandMatch) {
-      let currentCommand = currentCommandMatch[0].trim();
+      let currentCommand = currentCommandMatch.groups.expression.trim();
       const currentAction = currentCommandMatch.groups.sign;
-      const currentCommandWithoutSpaces = currentCommand.replace(new RegExp(`( +)[${currentAction}]{1,2}( +)`), currentAction);
-      commandPart = commandPart.replace(currentCommand, currentCommandWithoutSpaces);
+      commandPart = commandPart.replace(new RegExp(`(?: +)([${actions}]{1,2})(?: +)`), "$1");
       const methodForTheAction = methodsToActions.find(obj => obj.action === currentAction).method;
-      let currentResult = String(await methodForTheAction(currentCommandWithoutSpaces, true));
+      stdin = lastCommandExecuted.includes('|') ;
+      let currentResult = String(await methodForTheAction(currentCommand, stdin));
+      lastCommandExecuted.splice(0, lastCommandExecuted.length, currentAction);
+
       currentResult = currentResult.replace("\033[0m", "").replace("\033[31m", "")
       console.log("currentResult", currentResult);
 
-      let newCommand = commandPart.replace(currentCommandWithoutSpaces, currentResult);
+      let newCommand = commandPart.replace(currentCommand, currentResult);
 
-      result += !newCommand.match(new RegExp(`[${actions}]`)) ? `${currentResult}\n` : await executeCommands(newCommand) + '\n';
+      result += !newCommand.match(new RegExp(`[${actions}]`)) ? `${currentResult}\n` : await executeCommands(newCommand, lastCommandExecuted) + '\n';
       continue;
     }
 
@@ -140,7 +144,8 @@ async function executeCommands(commands) {
 async function automateCall(command) {
   if (!server.address) throw new Error("server is not running");
   const result = await executeCommands(command);
-  console.log("result:", result);
+  const organizedResult = result.replace("\n+$", '');
+  console.log("result:", organizedResult);
 }
 
 
@@ -148,5 +153,7 @@ async function automateCall(command) {
 const string = "grep lines /root/file1.txt";
 console.log("separateCommandArgs: ", separateCommandArgs(string));
 // automateCall("cat /root/file1.txt | grep content| grep File; cat file2.txt");
+// automateCall("ls | cat /root/file1.txt | cat file2.txt > /root/a.txt");
+// automateCall("echo hi > /root/ab.txt");
 // automateCall(string);
-automateCall("echo hello | grep -o hel >> /root/file9.txt");
+// automateCall("ls");
