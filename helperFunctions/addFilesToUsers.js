@@ -1,11 +1,13 @@
 const { File } = require("../resources/file");
 const baseDirs = require("../configs/baseDirs.json");
 const envConstants = require("../configs/envConstants.json");
+const environmentVariables = require("../configs/environmentVariables.json");
 const { extractPathParameters } = require("../resources/paths");
 
 
-function displayErrorMessage(errorMsg, resultList) {
+function displayErrorMessage(errorMsg, resultList, errors) {
     console.log(errorMsg);
+    errors.push(errorMsg);
     resultList.push(errorMsg);
 }
 
@@ -20,7 +22,7 @@ function addNewFile(newPath, fileOwner, addedFilesAndDirsList, parentDirectory, 
     parentDirectory.content.push(newDirectory);
 }
 
-function handleFileAlreadyExists(user, filePath, shouldAcceptExistingFile, commandName, allNewFiles, fileType, content, shouldOverride, shouldAppend) {
+function handleFileAlreadyExists(user, filePath, shouldAcceptExistingFile, commandName, allNewFiles, fileType, content, shouldOverride, shouldAppend, errors) {
   const fullPathSearchResult = user.findFile(filePath, fileType);
   if (fullPathSearchResult) {
     if (shouldAppend) {
@@ -35,19 +37,19 @@ function handleFileAlreadyExists(user, filePath, shouldAcceptExistingFile, comma
     }
 
     if (!shouldAcceptExistingFile) 
-        displayErrorMessage(`${commandName}: cannot create directory ${filePath}: File exists`, allNewFiles);
+        displayErrorMessage(`${commandName}: cannot create directory ${filePath}: File exists`, allNewFiles, errors);
       return false; 
   }
   return true;  
 }
 
-function getContainingDirAndNewPath(user, currentFilePath, commandName, allNewFiles) {
+function getContainingDirAndNewPath(user, currentFilePath, commandName, allNewFiles, errors) {
   const { filePath, FilePathWithFileName } = extractPathParameters(currentFilePath);
 
   if (currentFilePath.startsWith(baseDirs.rootPath)) {   
     let containingDirSearchResult = user.findFile(filePath, envConstants.types.d);
     if (!containingDirSearchResult) {
-      displayErrorMessage(`${commandName}: cannot create directory '${filePath}': No such file or directory`, allNewFiles);
+      displayErrorMessage(`${commandName}: cannot create directory '${filePath}': No such file or directory`, allNewFiles, errors);
       return;
     }
 
@@ -64,20 +66,22 @@ function getContainingDirAndNewPath(user, currentFilePath, commandName, allNewFi
 }
 
 function addNewFilesOrDirs(owner, user, pathsToNewFiles, shouldAcceptExistingFile, commandName, type, content=null, shouldOverride=false, shouldAppend=false) {
-    let allNewFiles = [];
+    let allNewFiles = [], errors = [];
     
     for (currentFilePath of pathsToNewFiles) {
       const shouldContinue = handleFileAlreadyExists(user, currentFilePath, shouldAcceptExistingFile,
-         commandName, allNewFiles, type, content, shouldOverride, shouldAppend);
+         commandName, allNewFiles, type, content, shouldOverride, shouldAppend, errors);
       if (!shouldContinue)
         continue;
     
       const result = getContainingDirAndNewPath(user, currentFilePath,
-         shouldAcceptExistingFile, commandName, allNewFiles, type, shouldOverride);
+         shouldAcceptExistingFile, commandName, allNewFiles, type, shouldOverride, errors);
       
       if (result)
         addNewFile(result.newPath, owner, allNewFiles, result.containingDir, type, content);
     }
+
+    environmentVariables.EXIT_CODE = errors.length ? 1 : 0;  // 1 signifies an error
     return allNewFiles;
 }
 

@@ -2,10 +2,11 @@ const express = require("express");
 const authUser = require("../middleware/authUser");
 const authFile = require("../middleware/authFile");
 const envConstants = require("../configs/envConstants.json");
-
+const environmentVariables = require("../configs/environmentVariables.json");
 const router = express.Router();
 
 router.post("/:userName", authUser, authFile, (req, res) => {
+  const errors = [];
   const lsResult = req.file.reduce((accumulator, currentFile, currentIndex) => {
     const currentFilePath = req.body.params[currentIndex];
 
@@ -23,6 +24,7 @@ router.post("/:userName", authUser, authFile, (req, res) => {
     );
   }, "");
 
+  environmentVariables.EXIT_CODE = errors.length ? 1 : 0;  // 1 signifies an error
   res.send(lsResult.slice(0));
 });
 

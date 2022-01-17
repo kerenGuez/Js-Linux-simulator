@@ -1,4 +1,5 @@
 {
     "PWD": "/root",
-    "HOME": "/root"
+    "HOME": "/root",
+    "EXIT_CODE": "0"
 }

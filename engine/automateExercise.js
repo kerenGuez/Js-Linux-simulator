@@ -1,3 +1,4 @@
+const environmentVariables = require("../configs/environmentVariables.json");
 const { server, baseUrl, apiRoutes } = require("../index");
 const axios = require("axios");
 
@@ -79,12 +80,21 @@ async function append(command, stdin=false) {
 
 async function AndOrOperators(command, sign, stdin=false) {
   const [beforeSign, afterSign] = command.split(sign);
-  const result = stdin ? beforeSign : await computeCommand(beforeSign);
-  // if ($? === 0)
+  let result = "";
+  result += stdin ? beforeSign + '\n' : await computeCommand(beforeSign) + '\n';
+
   switch(sign) {
-    case '&&': if (result) return await computeCommand(afterSign);
-    case '||': if (!result) return await computeCommand(afterSign);
+    case '&&': return (environmentVariables.EXIT_CODE === 0) ? `${result}${await computeCommand(afterSign)}\n` : result;
+    case '||': return (environmentVariables.EXIT_CODE) ? `${result}${await computeCommand(afterSign)}\n` : result;
   }
+}
+
+async function andOperator(command, stdin=false) {
+  return await AndOrOperators(command, '&&', stdin);
+}
+
+async function orOperator(command, stdin=false) {
+  return await AndOrOperators(command, '||', stdin);
 }
 
 const actions = "><|&"
@@ -92,7 +102,6 @@ const actions = "><|&"
 // Gets the first expression found, and it's action is save in the group named 'sign'
 const actionPattern = `(?<expression>[^${actions}]+(?<sign>[${actions}]{1,2})[^${actions}]+)`;
 const pipePattern = `(?<expression>[^${actions}]+(?<sign>[|])[^${actions}]+([|][^${actions}]+)*)`
-// const ifOperatorPattern = `/(?<expression>(?<beforeSign>[^${actions}]+?)(?<sign>&&)(?<rest>.+))/`
 
 // returns the first appearing match in the text - whether it's pipe or general command
 function getMatch(command) {
@@ -108,6 +117,8 @@ const methodsToActions = [
   {action: "|", method: pipe}, 
   {action: ">", method: redirect},
   {action: ">>", method: append},
+  {action: "&&", method: andOperator},
+  {action: "||", method: orOperator},
 ]
 
 async function executeCommands(commands, lastCommandExecuted) {
@@ -116,21 +127,20 @@ async function executeCommands(commands, lastCommandExecuted) {
   let result = "";
   let stdin = false;
   for (let commandPart of commandsParts) {
+    commandPart = commandPart.replace(new RegExp(`(?: +)([${actions}]{1,2})(?: +)`), "$1");
     const currentCommandMatch = getMatch(commandPart);
     if (currentCommandMatch) {
       let currentCommand = currentCommandMatch.groups.expression.trim();
       const currentAction = currentCommandMatch.groups.sign;
-      commandPart = commandPart.replace(new RegExp(`(?: +)([${actions}]{1,2})(?: +)`), "$1");
       const methodForTheAction = methodsToActions.find(obj => obj.action === currentAction).method;
-      stdin = lastCommandExecuted.includes('|') ;
+      const stdinActions = ['|', '&&', '||'];
+      stdin = stdinActions.some(action => lastCommandExecuted.includes(action));
       let currentResult = String(await methodForTheAction(currentCommand, stdin));
       lastCommandExecuted.splice(0, lastCommandExecuted.length, currentAction);
 
       currentResult = currentResult.replace("\033[0m", "").replace("\033[31m", "")
-      console.log("currentResult", currentResult);
 
       let newCommand = commandPart.replace(currentCommand, currentResult);
-
       result += !newCommand.match(new RegExp(`[${actions}]`)) ? `${currentResult}\n` : await executeCommands(newCommand, lastCommandExecuted) + '\n';
       continue;
     }
@@ -144,16 +154,14 @@ async function executeCommands(commands, lastCommandExecuted) {
 async function automateCall(command) {
   if (!server.address) throw new Error("server is not running");
   const result = await executeCommands(command);
-  const organizedResult = result.replace("\n+$", '');
-  console.log("result:", organizedResult);
+  const organizedResult = result.split('\n').filter(arg => arg !== '').join('\n');
+  console.log("\n\n\033[33m---separator---\033[0m\n", "\033[31mResult:\033[0m", organizedResult);
 }
 
-
-
-const string = "grep lines /root/file1.txt";
+const string = "grep 'lines' /root/file1.txt";
 console.log("separateCommandArgs: ", separateCommandArgs(string));
 // automateCall("cat /root/file1.txt | grep content| grep File; cat file2.txt");
 // automateCall("ls | cat /root/file1.txt | cat file2.txt > /root/a.txt");
 // automateCall("echo hi > /root/ab.txt");
 // automateCall(string);
-// automateCall("ls");
+// automateCall("ls && cat /root && cat /root/file2.txt || echo third && echo yes");

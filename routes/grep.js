@@ -1,6 +1,7 @@
 const express = require("express");
 const authUser = require("../middleware/authUser");
 const authTheFile = require("../middleware/abstractAuthFile");
+const environmentVariables = require("../configs/environmentVariables.json");
 const envConstants = require("../configs/envConstants.json");
 
 const router = express.Router();
@@ -74,14 +75,18 @@ function basicGrep(text, wordToSearch, flags) {
 // console.log(basicGrep(string, "hello", {'o': true}));
 
 router.post("/:userName", authUser, (req, res) => {
+  const errors = [];
   let content = "";
   let stdin = req.body.stdin;
   let [pattern, ...files] = req.body.params;
   let flags = req.body.flags || {};
   const allFiles = authTheFile(req.user, files, res, stdin);
   for (let i = 0; i < allFiles.length; i++) {
-    if (allFiles[i].type == envConstants.types.d)
-      content += `grep: ${allFiles[i].path}: Is a directory\n`;
+    if (allFiles[i].type == envConstants.types.d) {
+      let errorMsg = `grep: ${allFiles[i].path}: Is a directory\n`;
+      errors.push(errorMsg);
+      content += errorMsg;
+    }
     
     else if (allFiles.length === 1)
         content += basicGrep(allFiles[i].content, pattern, flags) + '\n';
@@ -93,6 +98,7 @@ router.post("/:userName", authUser, (req, res) => {
 
   content = content.replace(/\n$/g, "");
 
+  environmentVariables.EXIT_CODE = errors.length ? 1 : 0;  // 1 signifies an error
   console.log("grep:", content);
   res.send(content);
 });

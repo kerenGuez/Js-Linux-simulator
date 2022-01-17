@@ -31,14 +31,16 @@ describe("/api/v1/cd/keren", () => {
             filePath = ['/root', '/bin'];
             const res = await exec();
 
-            expect(res.status).toBe(400);
+            expect(res.status).toBe(200);
+            expect(res.text).toBe(`-bash: cd: too many arguments`);
         });
 
         it("should return 404 if the type of the object is file and not directory", async () => {
             filePath = ['/root/file1.txt'];
             const res = await exec();
 
-            expect(res.status).toBe(404);
+            expect(res.status).toBe(200);
+            expect(res.text).toBe(`-bash: cd: cannot cd '${filePath[0]}': Not a directory`);
         });
 
         it("should return 404 if directory doesn't exist", async () => {

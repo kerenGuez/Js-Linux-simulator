@@ -1,6 +1,6 @@
 const envConstants = require("../configs/envConstants.json");
-const baseDirs = require("../configs/baseDirs.json");
 const { extractPathParameters } = require("../resources/paths");
+const environmentVariables = require("../configs/environmentVariables.json");
 
 function copyFile(sourceFile, destDirectory, newCopiedFilePath, shouldRemoveSrcFile=false) {
     const copiedFile = sourceFile.file.clone(newCopiedFilePath);
@@ -17,16 +17,20 @@ function validateReq(req, res, commandName) {
     if (!req.body.params || req.body.params.length < 1)
       return res.status(401).send("Access denied, no filePath provided.");
   
-    if (req.body.params === 1)
-      return res.status(400).send(`${commandName}: missing destination file operand after ${req.body.params[0]}`);
+    if (req.body.params === 1) {
+      const errorMsg = `${commandName}: missing destination file operand after ${req.body.params[0]}`;
+      handleErrors(errorMsg, errors);
+      return res.send(errorMsg);
+    }
 }
 
 function findFile(user, filePath, res, commandName, fileType, throwError=true) {
     const foundFile = user.findFile(filePath, fileType);
-    if (!foundFile && throwError)
-      return res
-        .status(400)
-        .send(`${commandName}: cannot create regular file '${filePath}': No such file or directory`);
+    if (!foundFile && throwError){
+      const errorMsg = `${commandName}: cannot create regular file '${filePath}': No such file or directory`;
+      handleErrors(errorMsg, errors);
+      return res.send(errorMsg);
+    }
   
     return foundFile;
 }
@@ -75,6 +79,7 @@ function copyMultipleSourcesToDest(user, res, destDirectoryPath, sourcesPaths, c
       let foundFile = findFile(user, sourcePath, res, commandName, envConstants.types.f, false);
       if (!foundFile) {
         const errorMsg = `${commandName}: cannot stat ${sourcePath}: No such file or directory`;
+        handleErrors(errorMsg, errors);
         allCopiedFiles.push(errorMsg);
         continue;
       }
@@ -84,7 +89,7 @@ function copyMultipleSourcesToDest(user, res, destDirectoryPath, sourcesPaths, c
       // You cannot copy 2 files with the same name at once.
       if (copiedFilesNames.includes(newCopiedFileName)) {
         const errorMsg = `${commandName}: will not overwrite just-created '${newPath}' with '${sourcePath}'`;
-        console.log(errorMsg);
+        handleErrors(errorMsg, errors);
         allCopiedFiles.push(errorMsg);
         continue;
       }
@@ -98,24 +103,35 @@ function copyMultipleSourcesToDest(user, res, destDirectoryPath, sourcesPaths, c
     return allCopiedFiles;
 }
 
+function handleErrors(errorMsg, errors) {
+  console.log(errorMsg);
+  errors.push(errorMsg);
+}
+
 function copyAndOrRemove(user, filePaths, req, res, commandName, shouldRemoveSrcFile=false) {
     let allCopiedFiles;
     validateReq(req, res, commandName);
     const lastFileIndex = filePaths.length - 1;
   
+    const errors = [];
     const sourceFile = filePaths[0];
     const destFilePath  = filePaths[lastFileIndex];
     const sourceFileSearchResult = user.findFile(sourceFile, envConstants.types.f);
   
     if (!sourceFileSearchResult.file)
-      console.log(`${commandName}: cannot stat ${sourceFileSearchResult.file}: No such file or directory`)
-  
+    {
+      const errorMsg = `${commandName}: cannot stat ${sourceFileSearchResult.file}: No such file or directory`;
+      handleErrors(errorMsg, errors);
+    }
+
     if (filePaths.length === 2) {
       allCopiedFiles = CopySrcFileToDest(user, sourceFileSearchResult, destFilePath, res, commandName, shouldRemoveSrcFile);
     }
     else {
       allCopiedFiles = copyMultipleSourcesToDest(user, res, destFilePath, filePaths.slice(0, lastFileIndex), commandName, shouldRemoveSrcFile);
     }
+
+    environmentVariables.EXIT_CODE = errors.length ? 1 : 0;  // 1 signifies an error
     return allCopiedFiles;
   
 }
