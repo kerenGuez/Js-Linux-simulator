@@ -63,6 +63,7 @@ function basicGrep(text, wordToSearch, flags) {
         if (matchesPositions.length) 
             grepResult += colorMatches(line, matchesPositions, flags);   
     }
+    
     return grepResult.replace(/(\n)+$/g, "");
 }
 
@@ -97,6 +98,9 @@ router.post("/:userName", authUser, (req, res) => {
   }
 
   content = content.replace(/\n$/g, "");
+  if (!content) {
+    errors.push('');
+  }
 
   environmentVariables.EXIT_CODE = errors.length ? 1 : 0;  // 1 signifies an error
   console.log("grep:", content);

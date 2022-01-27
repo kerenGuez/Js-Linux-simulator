@@ -6,7 +6,7 @@ module.exports = function authTheFile(reqUser, filePaths, res, stdin=null, shoul
     const { user } = reqUser;
 
     if (!filePaths | !filePaths.length) {
-      if (stdin)
+      if (stdin || stdin === '')
         return [new File(``, stdin)];
 
       return res.status(401).send("Access denied, no filePath provided.");
