@@ -37,6 +37,7 @@ async function computeCommand(command, stdin = false) {
   if (!apiRoutes.includes(route)) throw new Error("Command doesn't exist.");
 
   try {
+    // TODO : make requests per generic user
     const result = await axios.post(`${baseUrl}/${route}/keren/`, {
       params: args,
       flags: flags,
@@ -69,16 +70,28 @@ async function append(command, stdin = false) {
   return await redirectOrAppend(command, "append", stdin);
 }
 
-async function AndOrOperators(command, sign, stdin = false, lastCommandExecuted) {
-  const [beforeSign, afterSign] = command.split(sign);
+async function AndOrOperators(
+  command,
+  sign,
+  stdin = false,
+  lastCommandExecuted
+) {
+  const SignIndex = command.indexOf(sign);
+  const beforeSign = command.substring(0, SignIndex);
+  const afterSign = command.substring(SignIndex + 2, command.length);
   let result = "";
-  result += (stdin === beforeSign)
-    ? beforeSign + "\n"
-    : (await executeCommands(beforeSign, lastCommandExecuted, stdin)) + "\n";
+  result +=
+    stdin === beforeSign
+      ? beforeSign + "\n"
+      : (await executeCommands(beforeSign, lastCommandExecuted, stdin)) + "\n";
 
   const exitCode = environmentVariables.EXIT_CODE;
   if ((sign === "&&" && exitCode === 0) || (sign === "||" && exitCode)) {
-    return `${result}${await executeCommands(afterSign, lastCommandExecuted, stdin)}\n`.trim()
+    return `${result}${await executeCommands(
+      afterSign,
+      [sign],
+      result
+    )}\n`.trim();
   }
   return result.trim();
 }
@@ -99,8 +112,12 @@ function extractOuterParentheses(string) {
 
   for (let i = indexOfOpenParentheses + 1; i < string.length; i++) {
     switch (string[i]) {
-      case "(": openParenthesesCount++; break;
-      case ")": openParenthesesCount--; break;
+      case "(":
+        openParenthesesCount++;
+        break;
+      case ")":
+        openParenthesesCount--;
+        break;
     }
 
     if (openParenthesesCount === 0)
@@ -120,12 +137,14 @@ function extractOuterParentheses(string) {
 const actions = "><|&()";
 
 const notCloseCharsPattern = (char) => `(?<![${char}])[${char}](?![${char}])`;
-const bothNotClosedPattern = `(${notCloseCharsPattern("|")})|(${notCloseCharsPattern("&")})`;
+const bothNotClosedPattern = `(${notCloseCharsPattern(
+  "|"
+)})|(${notCloseCharsPattern("&")})`;
 const allOkPattern = `((${bothNotClosedPattern})|([^${actions}]))+`;
 const parentheses = `\\(.+\\)`;
 const andOrWithParentheses = `(${allOkPattern})?(${parentheses})?(${allOkPattern})?`;
 const pipeWithPatterns = `([^${actions}]+)?(${parentheses})?([^${actions}]+)?`;
-// Gets the first expression found, and it's action is save in the group named 'sign'
+// Gets the first expression found, and it's action is saved in the group named 'sign'
 const actionPattern = `(?<expression>([^${actions}]+)?(?<sign>[${actions}]{1,2})[^${actions}]+)`;
 // const pipePattern = `(?<expression>[^${actions}]+(?<sign>[|])(${pipeWithPatterns})([|](${pipeWithPatterns}))*)`;
 const pipePattern = `(?<expression>([^${actions}]+)?(?<sign>[|])(${pipeWithPatterns}))`;
@@ -141,11 +160,18 @@ const methodsToActions = [
 ];
 
 function removeOuterParentheses(str) {
-  const openingIndex = str.indexOf("\(");
-  return str.substring(0, openingIndex) + str.substring(openingIndex + 1, str.length - 1);
+  const openingIndex = str.indexOf("(");
+  return (
+    str.substring(0, openingIndex) +
+    str.substring(openingIndex + 1, str.length - 1)
+  );
 }
 
-async function parenthesesOperator(command, stdin = false, lastCommandExecuted) {
+async function parenthesesOperator(
+  command,
+  stdin = false,
+  lastCommandExecuted
+) {
   if (command.match(parentheses)) {
     command = removeOuterParentheses(command);
   }
@@ -157,20 +183,24 @@ async function pipe(pipeCommand, stdin, lastCommandExecuted) {
   const beforePipe = pipeCommand.substring(0, pipeIndex);
   const afterPipe = pipeCommand.substring(pipeIndex + 1, pipeCommand.length);
 
-  const firstPartResult = (stdin && stdin.trim() === beforePipe.trim()) ? beforePipe : await executeCommands(beforePipe, lastCommandExecuted, stdin);
+  const firstPartResult =
+    (stdin || stdin === '') && stdin.trim() === beforePipe.trim()
+      ? beforePipe
+      : await executeCommands(beforePipe, lastCommandExecuted, stdin);
 
-  return await executeCommands(
-    afterPipe,
-    lastCommandExecuted,
-    firstPartResult
-  );
+  return await executeCommands(afterPipe, ["|"], firstPartResult);
 }
 
 function organizeMinActionMatch(minMatch, parenthesesMatch) {
   // If parentheses are in the found match, take only the part until the closing parentheses
-  const parenthesesStartIndex =  parenthesesMatch.index;
-  if (minMatch && (parenthesesMatch.index > -1  && parenthesesStartIndex < minMatch.groups.expression.length - 1)) {
-    const lastParenthesesIndex = parenthesesStartIndex + parenthesesMatch.groups.expression.length;
+  const parenthesesStartIndex = parenthesesMatch.index;
+  if (
+    minMatch &&
+    parenthesesMatch.index > -1 &&
+    parenthesesStartIndex < minMatch.groups.expression.length - 1
+  ) {
+    const lastParenthesesIndex =
+      parenthesesStartIndex + parenthesesMatch.groups.expression.length;
     const expression = minMatch.groups.expression;
     minMatch.groups.expression = expression.slice(0, lastParenthesesIndex);
     // remove outer parentheses from the expression
@@ -194,7 +224,8 @@ function getMatch(command) {
   for (obj of sortedMethodsToActions) {
     let actionMatch = command.match(new RegExp(obj.pattern));
     let matchIndex = actionMatch ? actionMatch.index : 999999;
-    if (matchIndex === 0) return organizeMinActionMatch(actionMatch, parenthesesMatch);
+    if (matchIndex === 0)
+      return organizeMinActionMatch(actionMatch, parenthesesMatch);
 
     if (matchIndex < min) {
       minMatch = actionMatch;
@@ -215,7 +246,10 @@ async function executeCommands(commands, lastCommandExecuted, stdin = false) {
   commandsParts = commands.split(";");
   let result = "";
   for (let commandPart of commandsParts) {
-    commandPart = commandPart.replace(new RegExp(`(?: +)([${actions}]{1,2})(?: +)`), "$1");
+    commandPart = commandPart.replace(
+      new RegExp(`(?: +)([${actions}]{1,2})(?: +)`),
+      "$1"
+    );
     const currentCommandMatch = getMatch(commandPart);
     if (currentCommandMatch) {
       let currentCommand = currentCommandMatch.groups.expression.trim();
@@ -226,8 +260,10 @@ async function executeCommands(commands, lastCommandExecuted, stdin = false) {
       const stdinActions = ["|", "&&", "||", "("];
       stdin = stdinActions.some((action) =>
         lastCommandExecuted.includes(action)
-      ) ? stdin : false;
-  
+      )
+        ? stdin
+        : false;
+
       let currentResult = String(
         await methodForTheAction(currentCommand, stdin, lastCommandExecuted)
       );
@@ -272,7 +308,7 @@ const string = "grep 'lines' /root/file1.txt";
 // automateCall("ls | cat /root/file1.txt | cat file2.txt > /root/a.txt");
 // automateCall("echo hello | grep -o hell | grep -o he");
 // automateCall("(cat file2.txt)");
-// automateCall("cat /root | grep b | (echo yes || echo sorry) | grep hi || (echo fail)");
+// automateCall("cat /root | grep b | (echo yes || echo sorry) | grep hi || (echo fail)"); 
 
 // automateCall("echo hello | grep hell | (echo yes || echo sorry) | grep y || (echo fail)");
 // automateCall("echo hello | grep hell | (echo yes || echo sorry) | grep -o y || echo fail && echo success!");
@@ -281,8 +317,8 @@ const string = "grep 'lines' /root/file1.txt";
 // automateCall("echo hello | grep hell | (echo yes || echo sorry)");
 // automateCall("echo hello | grep hell | grep he");
 // automateCall("echo hello | grep y || echo fail && echo success");
-// automateCall("echo hello | grep y | grep t");
-automateCall("echo | (echo > /root/file5.txt)");
+// automateCall("echo hello | grep y | grep t"); 
+// automateCall("echo | (echo > /root/file5.txt)");
 // automateCall("echo > /root/file5.txt");
 
 // automateCall("echo hello | (grep e && (echo yeah && echo beep || echo no) || echo bope) && echo yes || echo nope");
